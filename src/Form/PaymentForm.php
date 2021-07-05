@@ -287,7 +287,7 @@ class PaymentForm extends FormBase {
       '#required' => TRUE,
     ];
 
-    $form['telephone_number'] = [
+    $form['phone'] = [
       '#type' => 'textfield',
       '#required' => TRUE,
       '#placeholder' => $this->t("Enter a phone number we can contact you with"),

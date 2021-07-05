@@ -366,8 +366,12 @@ class Payment extends ContentEntityBase implements PaymentInterface {
 
     $fields = parent::baseFieldDefinitions($entity_type);
 
-    $fields['street'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Street'))
+    $fields['faculty'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Faculty'))
+      ->setSetting('max_length', 128);
+
+    $fields['full_name'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Full name'))
       ->setRequired(TRUE)
       ->setSetting('max_length', 255)
       ->setDisplayOptions('form', [
@@ -382,8 +386,19 @@ class Payment extends ContentEntityBase implements PaymentInterface {
       ])
       ->setDisplayConfigurable('view', TRUE);
 
-    $fields['city'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('City'))
+    $fields['place_of_birth'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Place of birth'))
+      ->setSetting('max_length', 255);
+
+    $fields['date_of_birth'] = BaseFieldDefinition::create('datetime')
+      ->setLabel(t('Date of birth'));
+
+    $fields['mothers_name'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Mother\'s name'))
+      ->setSetting('max_length', 255);
+
+    $fields['email'] = BaseFieldDefinition::create('email')
+      ->setLabel(t('Email address'))
       ->setRequired(TRUE)
       ->setSetting('max_length', 255)
       ->setDisplayOptions('form', [
@@ -398,26 +413,14 @@ class Payment extends ContentEntityBase implements PaymentInterface {
       ])
       ->setDisplayConfigurable('view', TRUE);
 
-    $fields['county'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('County'))
-      ->setSetting('max_length', 255)
-      ->setSetting('default_value', '')
-      ->setDisplayOptions('form', [
-        'type' => 'string_textfield',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('view', [
-        'label' => 'hidden',
-        'type' => 'string',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('view', TRUE);
+    $fields['nationality'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Nationality'))
+      ->setSetting('max_length', 128);
 
-    $fields['country'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Country'))
+    $fields['phone'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Telephone'))
       ->setRequired(TRUE)
-      ->setSetting('max_length', 2)
+      ->setSetting('max_length', 32)
       ->setDisplayOptions('form', [
         'type' => 'string_textfield',
         'weight' => -5,
@@ -446,24 +449,8 @@ class Payment extends ContentEntityBase implements PaymentInterface {
       ])
       ->setDisplayConfigurable('view', TRUE);
 
-    $fields['title'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Title'))
-      ->setRequired(TRUE)
-      ->setSetting('max_length', 3)
-      ->setDisplayOptions('form', [
-        'type' => 'string_textfield',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('view', [
-        'label' => 'hidden',
-        'type' => 'string',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('view', TRUE);
-
-    $fields['first_name'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('First name'))
+    $fields['city'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('City'))
       ->setRequired(TRUE)
       ->setSetting('max_length', 255)
       ->setDisplayOptions('form', [
@@ -478,8 +465,8 @@ class Payment extends ContentEntityBase implements PaymentInterface {
       ])
       ->setDisplayConfigurable('view', TRUE);
 
-    $fields['last_name'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Last name'))
+    $fields['street'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Street'))
       ->setRequired(TRUE)
       ->setSetting('max_length', 255)
       ->setDisplayOptions('form', [
@@ -494,37 +481,37 @@ class Payment extends ContentEntityBase implements PaymentInterface {
       ])
       ->setDisplayConfigurable('view', TRUE);
 
-    $fields['email'] = BaseFieldDefinition::create('email')
-      ->setLabel(t('Email address'))
-      ->setRequired(TRUE)
-      ->setSetting('max_length', 255)
-      ->setDisplayOptions('form', [
-        'type' => 'string_textfield',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('view', [
-        'label' => 'hidden',
-        'type' => 'string',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('view', TRUE);
+    $fields['major'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Major'))
+      ->setSetting('max_length', 255);
 
-    $fields['phone'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Telephone'))
-      ->setRequired(TRUE)
-      ->setSetting('max_length', 32)
-      ->setDisplayOptions('form', [
-        'type' => 'string_textfield',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('view', [
-        'label' => 'hidden',
-        'type' => 'string',
-        'weight' => -5,
-      ])
-      ->setDisplayConfigurable('view', TRUE);
+    $fields['etk_city'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('ETK city'))
+      ->setSetting('max_length', 64);
+
+    $fields['notified'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Notified'))
+      ->setSetting('max_length', 255);
+
+    $fields['allergy'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Allergy'))
+      ->setSetting('max_length', 255);
+
+    $fields['meal'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('meal'))
+      ->setSetting('max_length', 255);
+
+    $fields['t_shirt_size'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('T-shirt size'))
+      ->setSetting('max_length', 8);
+
+    $fields['stay'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Stay'))
+      ->setSetting('max_length', 1);
+
+    $fields['stay_day'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('Stay day'))
+      ->setSetting('max_length', 255);
 
     $fields['charge_total'] = BaseFieldDefinition::create('float')
       ->setLabel(t('Amount'))
@@ -538,27 +525,6 @@ class Payment extends ContentEntityBase implements PaymentInterface {
         'label' => 'hidden',
         'type' => 'string',
         'weight' => -5,
-      ])
-      ->setDisplayConfigurable('view', TRUE);
-
-    $fields['newsletter'] = BaseFieldDefinition::create('boolean')
-      ->setLabel(t('Newsletter'))
-      ->setSetting('on_label', 'Enabled')
-      ->setDisplayOptions('form', [
-        'type' => 'boolean_checkbox',
-        'settings' => [
-          'display_label' => FALSE,
-        ],
-        'weight' => 0,
-      ])
-      ->setDisplayConfigurable('form', TRUE)
-      ->setDisplayOptions('view', [
-        'type' => 'boolean',
-        'label' => 'above',
-        'weight' => 0,
-        'settings' => [
-          'format' => 'enabled-disabled',
-        ],
       ])
       ->setDisplayConfigurable('view', TRUE);
 
