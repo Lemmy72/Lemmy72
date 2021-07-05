@@ -1,0 +1,6 @@
+name: Simplepay
+type: module
+description: Simplepay payment gateway
+package: Custom
+core: 8.x
+core_version_requirement: ^8 || ^9

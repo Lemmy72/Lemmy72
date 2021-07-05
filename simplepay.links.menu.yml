@@ -1,0 +1,13 @@
+simplepay.config:
+  title: PTE
+  description: 'PTE settings.'
+  parent: system.admin_config
+  route_name: simplepay.config
+  weight: 100
+
+simplepay.settings:
+  title: 'Simplepay settings'
+  description: 'Configure Simplepay form related settings.'
+  parent: simplepay.config
+  route_name: simplepay.settings
+  weight: 101

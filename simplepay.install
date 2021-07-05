@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * @file
+ * Update hooks for the PTE simplepay.
+ */
+
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+
+/**
+ * Implements hook_install().
+ */
+function simplepay_install() {
+  \Drupal::entityTypeManager()->clearCachedDefinitions();
+  $entity_type = \Drupal::entityTypeManager()->getDefinition('payment');
+  \Drupal::entityDefinitionUpdateManager()->installEntityType($entity_type);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function simplepay_uninstall($is_syncing) {
+  \Drupal::entityTypeManager()->clearCachedDefinitions();
+  $entity_type = \Drupal::entityTypeManager()->getDefinition('payment');
+  \Drupal::entityDefinitionUpdateManager()->uninstallEntityType($entity_type);
+}

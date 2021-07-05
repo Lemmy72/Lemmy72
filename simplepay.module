@@ -1,0 +1,38 @@
+<?php
+
+use Drupal\node\Entity\Node;
+use Drupal\simplepay\Form\SettingsForm;
+
+function simplepay_preprocess_node(array &$variables) {
+
+  $config_factory = \Drupal::service('config.factory');
+  $config = $config_factory->get(SettingsForm::SETTINGS);
+  $fail_url_id = $config->get('data')['response_fail_url'];
+  $success_url_id = $config->get('data')['response_success_url'];
+  $cancel_url_id = $config->get('data')['response_cancel_url'];
+  $timeout_url_id = $config->get('data')['response_timeout_url'];
+
+  if (!empty($variables['elements']['#node'])
+    && $variables['elements']['#node'] instanceof Node
+    && ($variables['elements']['#node']->id() === $success_url_id ||
+      $variables['elements']['#node']->id() === $fail_url_id ||
+      $variables['elements']['#node']->id() === $cancel_url_id ||
+      $variables['elements']['#node']->id() === $timeout_url_id)
+  ) {
+    $post = \Drupal::request()->request->all();
+
+    /*if (!empty($post['chargetotal']) && !empty($post['currency'])
+      && !empty($post['txndatetime']) && !empty($post['approval_code'])
+      && !empty($post['response_hash'])) {
+
+      $hash = DonateForm::notificationHash($post['chargetotal'],
+        $post['currency'],
+        $post['txndatetime'],
+        $post['approval_code']);
+
+      if ($hash === $post['response_hash']) {
+        _ga_donate_save_donate($post);
+      }
+    }*/
+  }
+}

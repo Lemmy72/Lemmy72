@@ -1,0 +1,15 @@
+simplepay.config:
+  path: '/admin/config/pte'
+  defaults:
+    _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
+    _title: PTE
+  requirements:
+    _permission: 'administer site configuration'
+
+simplepay.settings:
+  path: '/admin/config/pte/simplepay/settings'
+  defaults:
+    _form: '\Drupal\simplepay\Form\SettingsForm'
+    _title: 'Simplepay settings'
+  requirements:
+    _permission: 'administer site configuration'
