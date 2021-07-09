@@ -1,0 +1,132 @@
+environment: 'test'
+data:
+  huf_merchant: S215011
+  huf_secret_key: R5BdikRrhi112M2f23232y6W3j5r3k6S
+  eur_merchant:
+  eur_secret_key:
+  usd_merchant:
+  usd_secret_key:
+  response_success_url:
+  response_fail_url:
+  response_cancel_url:
+  response_timeout_url:
+  notification_email: pest.attila@gmail.com
+  email_content:
+faculties:
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 1
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 2
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 3
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 4
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 5
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 6
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 7
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 8
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 9
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 10
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 11
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 12
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'
+  -
+    pst: '123456789'
+    price: 25000
+    location: Pécs
+    participants: 13
+    start_date: '2021-08-01'
+    end_date: '2021-08-05'
+    apply_start_date: '2021-07-15'
+    apply_end_date: '2021-07-30'

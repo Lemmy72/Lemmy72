@@ -13,9 +13,11 @@ use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\TrustedRedirectResponse;
 use Drupal\simplepay\Entity\Payment;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Messenger\MessengerInterface;
+use Drupal\Core\Url;
 
 /**
  * Provide the Payment form.
@@ -118,6 +120,9 @@ class PaymentForm extends FormBase {
           'SERVER_DATA' => $_SERVER,
           'AUTOCHALLENGE' => TRUE,
         ];
+
+        require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
+
       } catch (InvalidPluginDefinitionException|PluginNotFoundException|EntityMalformedException $e) {
         $this->logger('simplepay')->warning($e->getMessage());
       }
@@ -154,9 +159,6 @@ class PaymentForm extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    //TODO PST menteni
-    //Ellenorzni hogy a sikeres megrendelesek szama kisebb-e mint a letszam az adott karnal
-    //foglalasi idopont ellenorzese az adott karnal
 
     $form['description'] = [
       '#type' => 'item',
@@ -180,46 +182,50 @@ class PaymentForm extends FormBase {
     ];
 
     $selected_faculty = $form_state->getValues()['faculty'];
-
-    $form['info'] = [
-      '#type' => 'item',
-      '#markup' => $this->t('<strong>A tábor ideje: @date<br>A tábor helyszíne: @location<br>Jelentkezési időszak: @apply<br>Tábor díja: @price</strong>',
+    $info = '';
+    if (is_numeric($selected_faculty)) {
+      $info = $this->t('<strong>A tábor ideje: @date<br>A tábor helyszíne: @location<br>Jelentkezési időszak: @apply<br>Tábor díja: @price</strong>',
         [
-          '@date' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['start_date'] . ' - ' . $faculties_data[$selected_faculty]['end_date'] : '',
-          '@location' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['location'] : '',
-          '@apply' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['apply_start_date'] . ' - ' . $faculties_data[$selected_faculty]['apply_end_date'] : '',
-          '@price' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['price'] . ' Ft.' : '',
-        ]),
+          '@date' => $faculties_data[$selected_faculty]['start_date'] . ' - ' . $faculties_data[$selected_faculty]['end_date'],
+          '@location' => $faculties_data[$selected_faculty]['location'],
+          '@apply' => $faculties_data[$selected_faculty]['apply_start_date'] . ' - ' . $faculties_data[$selected_faculty]['apply_end_date'],
+          '@price' => $faculties_data[$selected_faculty]['price'] . ' Ft.',
+        ]);
+    }
+
+    $form['apply']['info'] = [
+      '#type' => 'item',
+      '#markup' => $info,
     ];
 
-    $can_apply = TRUE;
+    $can_apply = FALSE;
     if ($faculties_data[$selected_faculty]['apply_start_date'] && $faculties_data[$selected_faculty]['apply_end_date']) {
       $apply_start_ts = strtotime($faculties_data[$selected_faculty]['apply_start_date'] . ' 00:00:00');
       $apply_end_ts = strtotime($faculties_data[$selected_faculty]['apply_end_date'] . ' 23:59:59');
       $current_time = time();
-      if ($current_time < $apply_start_ts || $current_time > $apply_end_ts) {
-        $can_apply = FALSE;
-        $this->messenger->addMessage($this->t('Apply is note enabled, you can apply between @start and @end',
-          ['@start' => $faculties_data[$selected_faculty]['apply_start_date'], '@end' => $faculties_data[$selected_faculty]['apply_end_date']]));
+      if ($current_time > $apply_start_ts && $current_time < $apply_end_ts) {
+        $can_apply = TRUE;
+        /*$this->messenger->addMessage($this->t('Apply is not enabled, you can apply between @start and @end',
+          ['@start' => $faculties_data[$selected_faculty]['apply_start_date'], '@end' => $faculties_data[$selected_faculty]['apply_end_date']]));*/
       }
     }
 
     if ($can_apply) {
-      $form['full_name'] = [
+      $form['apply']['full_name'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Full name"),
         '#title' => $this->t("Full name"),
       ];
 
-      $form['place_of_birth'] = [
+      $form['apply']['place_of_birth'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Place of birth"),
         '#title' => $this->t("Place of birth"),
       ];
 
-      $form['date_of_birth'] = [
+      $form['apply']['date_of_birth'] = [
         '#type' => 'datelist',
         '#required' => TRUE,
         '#placeholder' => $this->t("Date of birth"),
@@ -228,61 +234,61 @@ class PaymentForm extends FormBase {
         '#date_year_range' => '1990:2005',
       ];
 
-      $form['mothers_name'] = [
+      $form['apply']['mothers_name'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Mother's name"),
         '#title' => $this->t("Mother's name"),
       ];
 
-      $form['email'] = [
+      $form['apply']['email'] = [
         '#type' => 'email',
         '#required' => TRUE,
         '#placeholder' => $this->t("Email address"),
         '#title' => $this->t("Email address"),
       ];
 
-      $form['nationality'] = [
+      $form['apply']['nationality'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Nationality'),
         '#required' => TRUE,
       ];
 
-      $form['phone'] = [
+      $form['apply']['phone'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Enter a phone number we can contact you with"),
         '#title' => $this->t("Telephone number"),
       ];
 
-      $form['postcode'] = [
+      $form['apply']['postcode'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Enter your postcode"),
         '#title' => $this->t("Postcode"),
       ];
 
-      $form['city'] = [
+      $form['apply']['city'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Enter name of your city or town"),
         '#title' => $this->t("City / Town"),
       ];
 
-      $form['street'] = [
+      $form['apply']['street'] = [
         '#type' => 'textfield',
         '#required' => TRUE,
         '#placeholder' => $this->t("Enter your number and street name"),
         '#title' => $this->t("Number / Street name"),
       ];
 
-      $form['major'] = [
+      $form['apply']['major'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Szak/szakirány/képzési központ/képzési rend'),
         '#required' => TRUE,
       ];
 
-      $form['etk_city'] = [
+      $form['apply']['etk_city'] = [
         '#type' => 'select',
         '#title' => $this->t('Melyik városban fogsz tanulni?'),
         '#options' => [
@@ -296,28 +302,28 @@ class PaymentForm extends FormBase {
         '#states' => ['visible' => ['select[name="faculty"]' => ['value' => '4']]],
       ];
 
-      $form['notified'] = [
+      $form['apply']['notified'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Szükség esetén értesítendő személy telefonszáma (szülő, gondviselő)'),
         '#description' => $this->t('Amennyiben szeretnéd, hogy szükség esetén értesítsünk egy általad megjelölt személyt (szülőt, gondviselőt), kérlek tüntesd fel elérhetőségüket!'),
         '#required' => FALSE,
       ];
 
-      $form['allergy'] = [
+      $form['apply']['allergy'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Allergia, egyéb betegség'),
         '#description' => $this->t('Amennyiben szeretnéd biztosítani, hogy a Gólyatábor területén tartózkodó egészségügyi ellátást nyújtó személyzet  gyógyszerek és gyógyászati segédeszközök tekintetében a legfelkészültebben tudja végezni feladatát, kérlek előzetesen tájékoztass minket ismert allergiáidról, betegségeidről! Az allergia/betegség előzetes bejelentése nagyban hozzájárul az egészségügyi személyzet hatékony felkészüléséhez.'),
         '#required' => FALSE,
       ];
 
-      $form['meal'] = [
+      $form['apply']['meal'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Étkezési igény/érzékenység'),
         '#description' => $this->t('Amennyiben szeretnéd, hogy speciális étkezési igényednek megfelelő ellátást biztosítsunk Neked, kérlek írd le ételallergiád, egyéb étkezési igényed!'),
         '#required' => FALSE,
       ];
 
-      $form['t_shirt_size'] = [
+      $form['apply']['t_shirt_size'] = [
         '#type' => 'select',
         '#title' => $this->t('T-Shirt size'),
         '#description' => $this->t('Amennyiben szeretnéd, hogy mérethelyes pólóval készülhessünk számodra, úgy kérlek tüntesd fel pólóméreted! Természetesen, ha nem szeretnéd megadni, akkor is biztosítunk Neked pólót, de ez esetben a mérethelyességet nem tudjuk garantálni.'),
@@ -331,7 +337,7 @@ class PaymentForm extends FormBase {
         ],
       ];
 
-      $form['stay'] = [
+      $form['apply']['stay'] = [
         '#type' => 'select',
         '#title' => $this->t('Meddig maradsz a táborban?'),
         '#options' => [
@@ -341,27 +347,27 @@ class PaymentForm extends FormBase {
         '#required' => TRUE,
       ];
 
-      $form['stay_day'] = [
+      $form['apply']['stay_day'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Meddig maradsz a táborban?'),
         '#states' => ['visible' => ['select[name="stay"]' => ['value' => '2']]],
       ];
 
-      $form['accept_nationality'] = [
+      $form['apply']['accept_nationality'] = [
         '#type' => 'checkbox',
         '#title' => $this
           ->t('Hozzájárulás az állampolgárság adat kezeléséhez'),
         '#description' => $this->t('Hozzájárulásomat adom állampolgárságomra vonatkozó adat statisztikai célból történő kezeléséhez hozzájárulásom visszavonásáig.'),
       ];
 
-      $form['accept_other'] = [
+      $form['apply']['accept_other'] = [
         '#type' => 'checkbox',
         '#title' => $this
           ->t('Hozzájárulás megbetegedés, pólóméret, szülő/gondviselő telefonszáma, étkezési igény adatok kezeléséhez'),
         '#description' => $this->t('Hozzájárulásomat adom allergiás és egyéb megbetegedésemre, pólóméretemre, szülő/gondviselő telefonszámára/étkezési igényre vonatkozó adatok kezeléséhez - azokra vonatkozóan, mely információkat jelen nyilatkozaton feltüntettem - extra szolgáltatások nyújtása céljából, hozzájárulásom visszavonásáig, de legfeljebb a Gólyatábor rendezvény végéig.'),
       ];
 
-      $form['accept_photo'] = [
+      $form['apply']['accept_photo'] = [
         '#type' => 'checkbox',
         '#title' => $this
           ->t('Hozzájárulás fotó és videófelvételek készítéséhez'),
@@ -369,7 +375,7 @@ class PaymentForm extends FormBase {
         '#required' => TRUE,
       ];
 
-      $form['accept_privacy'] = [
+      $form['apply']['accept_privacy'] = [
         '#type' => 'checkbox',
         '#title' => $this
           ->t('Adatkezelés'),
@@ -377,7 +383,7 @@ class PaymentForm extends FormBase {
         '#required' => TRUE,
       ];
 
-      $form['accept_rules'] = [
+      $form['apply']['accept_rules'] = [
         '#type' => 'checkbox',
         '#title' => $this
           ->t('Nyilatkozat a házirend elfogadásáról'),
@@ -385,7 +391,7 @@ class PaymentForm extends FormBase {
         '#required' => TRUE,
       ];
 
-      $form['accept_responsibility'] = [
+      $form['apply']['accept_responsibility'] = [
         '#type' => 'checkbox',
         '#title' => $this
           ->t('Nyilatkozat a személyi és anyagi felelősségről'),
@@ -393,14 +399,11 @@ class PaymentForm extends FormBase {
         '#required' => TRUE,
       ];
 
-      $form['actions']['#type'] = 'actions';
-      $form['actions']['submit'] = [
+      $form['apply']['actions']['#type'] = 'actions';
+      $form['apply']['actions']['submit'] = [
         '#type' => 'submit',
         '#value' => $this->t('Send'),
         '#button_type' => 'primary',
-        '#attributes' => [
-          'disabled' => $can_apply,
-        ]
       ];
     }
 
@@ -420,64 +423,32 @@ class PaymentForm extends FormBase {
     if ((int) $form_state->getValues()['faculty'] === 4 && empty($form_state->getValues()['etk_city'])) {
       $form_state->setErrorByName('etk_city', $this->t('ETK gólyatábor esetén kötelező.'));
     }
-
-    //$form_state->setRebuild(TRUE);
   }
 
   /**
-   * Function that calculates the hash of the following parameters.
+   * @param $r
+   * @param $s
    *
-   * - Store ID
-   * - Date/Time
-   * - Charge total
-   * - Currency (numeric ISO value)
-   * - shared secret.
-   *
-   * @param string $charge_total
-   *   Charge total.
-   * @param string $currency
-   *   Currency.
-   * @param string $txndatetime
-   *   Transaction date time.
-   *
-   * @return string
-   *   Hash string.
+   * @return array|false
    */
-  protected function createHash($charge_total, $currency, $txndatetime) {
-    $environment = $this->config->get('environment');
-    $store_id = $this->config->get('environments')[$environment]['store_name'];
-    $sharedSecret = $this->config->get('environments')[$environment]['shared_secret'];
-    $stringToHash = $store_id . $txndatetime . $charge_total . $currency . $sharedSecret;
-    $ascii = bin2hex($stringToHash);
-    return hash('sha256', $ascii);
-  }
+  public static function checkHash($r, $s) {
 
-  /**
-   * Notification Hash.
-   *
-   * Check hash to validate date before save donate entity.
-   *
-   * @param string $charge_total
-   *   Charge total.
-   * @param string $currency
-   *   Currency.
-   * @param string $txndatetime
-   *   Transaction date time.
-   * @param string $approval_code
-   *   Approval code.
-   *
-   * @return string
-   *   Hash string.
-   */
-  public static function notificationHash(string $charge_total, string $currency, string $txndatetime, string $approval_code): string {
     $config_factory = \Drupal::service('config.factory');
-    $config = $config_factory->get('ga_donate.settings');
-    $environment = $config->get('environment');
-    $store_id = $config->get('environments')[$environment]['store_name'];
-    $sharedSecret = $config->get('environments')[$environment]['shared_secret'];
-    $stringToHash = $sharedSecret . $approval_code . $charge_total . $currency . $txndatetime . $store_id;
-    $ascii = bin2hex($stringToHash);
-    return hash('sha256', $ascii);
+    $config = $config_factory->get(SettingsForm::SETTINGS);
+
+    require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
+    $trx = new \SimplePayBack();
+
+    $trx->addConfig([
+      'HUF_MERCHANT' => $config->get('data')['huf_merchant'],
+      'HUF_SECRET_KEY' => $config->get('data')['huf_secret_key'],
+      'SANDBOX' => (bool) $config->get('environment') == 'Test',
+    ]);
+
+    if ($trx->isBackSignatureCheck($r, $s)) {
+      return $trx->getRawNotification();
+    }
+    return FALSE;
   }
 
   /**
@@ -487,8 +458,6 @@ class PaymentForm extends FormBase {
 
     $faculties_data = $this->config->get('faculties');
     $selected_faculty = $form_state->getValues()['faculty'];
-
-    require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
 
     $trx = new \SimplePayStart;
     $order_id = str_replace([
@@ -500,11 +469,11 @@ class PaymentForm extends FormBase {
     $currency = 'HUF';
     $trx->addData('currency', $currency);
     $trx->addConfig($this->simplepayConfig);
-    $trx->addData('total', 3000);
-    $trx->addData('orderRef', );
+    $trx->addData('total', $faculties_data[$selected_faculty]['price']);
+    $trx->addData('orderRef', $order_id);
 
     $trx->addData('threeDSReqAuthMethod', '02');
-    $trx->addData('customerEmail', 'sdk_test@otpmobil.com');
+    $trx->addData('customerEmail', $form_state->getValue('email'));
     $trx->addData('language', 'HU');
     $timeoutInSec = 600;
     $timeout = @date("c", time() + $timeoutInSec);
@@ -516,15 +485,14 @@ class PaymentForm extends FormBase {
     $trx->addGroupData('urls', 'cancel', $this->simplepayConfig['URLS_CANCEL']);
     $trx->addGroupData('urls', 'timeout', $this->simplepayConfig['URLS_TIMEOUT']);
 
-
-    $trx->addGroupData('invoice', 'name', 'SimplePay V2 Tester');
-    //$trx->addGroupData('invoice', 'company', '');
+    $trx->addGroupData('invoice', 'name', $form_state->getValue('full_name'));
     $trx->addGroupData('invoice', 'country', 'hu');
-    $trx->addGroupData('invoice', 'state', 'Budapest');
-    $trx->addGroupData('invoice', 'city', 'Budapest');
-    $trx->addGroupData('invoice', 'zip', '1111');
-    $trx->addGroupData('invoice', 'address', 'Address 1');
+    $trx->addGroupData('invoice', 'city', $form_state->getValue('city'));
+    $trx->addGroupData('invoice', 'zip', $form_state->getValue('postcode'));
+    $trx->addGroupData('invoice', 'address', $form_state->getValue('street'));
 
+    $trx->runStart();
+    $simplepay_data = $trx->getReturnData();
 
     /** @var \Drupal\Core\Datetime\DrupalDateTime $dateObject */
     $dateObject = $form_state->getValue('date_of_birth');
@@ -551,9 +519,9 @@ class PaymentForm extends FormBase {
       'stay' => $form_state->getValue('stay'),
       'stay_day' => $form_state->getValue('stay_day'),
       'charge_total' => $faculties_data[$selected_faculty]['price'],
-      //'hash' => $form_state->getValue('notified'),
+      'hash' => $simplepay_data['salt'],
       'order_id' => $order_id,
-      //'transaction_id' => ,
+      'transaction_id' => $simplepay_data['transactionId'],
       'currency' => $currency,
       'pst' => $faculties_data[$selected_faculty]['pst'],
       'accept_nationality' => $form_state->getValue('accept_nationality'),
@@ -563,6 +531,8 @@ class PaymentForm extends FormBase {
 
     try {
       $payment->save();
+      $response = new TrustedRedirectResponse(Url::fromUri($simplepay_data['paymentUrl'])->toString());
+      $form_state->setResponse($response);
     }
     catch (EntityStorageException $e) {
       $this->logger('simplepay')->warning($e->getMessage());
@@ -571,8 +541,7 @@ class PaymentForm extends FormBase {
 
   public function loadInfo(array &$form, FormStateInterface $form_state): AjaxResponse {
     $response = new AjaxResponse();
-    $response->addCommand(new HtmlCommand('#edit-info', $form['info']));
-    $response->addCommand(new HtmlCommand('#edit-info', $form['info']));
+    $response->addCommand(new HtmlCommand('div.form-item-info', $form['apply']));
     return $response;
   }
 

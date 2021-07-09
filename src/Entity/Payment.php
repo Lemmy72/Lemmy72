@@ -289,6 +289,42 @@ class Payment extends ContentEntityBase implements PaymentInterface {
     return $this;
   }
 
+  public function getPst(): string {
+    return $this->get('pst')->value;
+  }
+
+  public function setPst(string $pst): PaymentInterface {
+    $this->set('pst', $pst);
+    return $this;
+  }
+
+  public function getAcceptNationality(): bool {
+    return $this->get('accept_nationality')->value;
+  }
+
+  public function setAcceptNationality(bool $accept_nationality): PaymentInterface {
+    $this->set('accept_nationality', $accept_nationality);
+    return $this;
+  }
+
+  public function getAcceptOther(): bool {
+    return $this->get('accept_other')->value;
+  }
+
+  public function setAcceptOther(bool $accept_nationality): PaymentInterface {
+    $this->set('accept_other', $accept_nationality);
+    return $this;
+  }
+
+  public function getAcceptPhoto(): bool {
+    return $this->get('accept_photo')->value;
+  }
+
+  public function setAcceptPhoto(bool $accept_nationality): PaymentInterface {
+    $this->set('accept_photo', $accept_nationality);
+    return $this;
+  }
+
   /**
    * {@inheritdoc}
    */
@@ -503,7 +539,18 @@ class Payment extends ContentEntityBase implements PaymentInterface {
 
     $fields['t_shirt_size'] = BaseFieldDefinition::create('string')
       ->setLabel(t('T-shirt size'))
-      ->setSetting('max_length', 8);
+      ->setSetting('max_length', 8)
+      ->setDisplayOptions('form', [
+        'type' => 'string_textfield',
+        'weight' => -5,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayOptions('view', [
+        'label' => 'hidden',
+        'type' => 'string',
+        'weight' => -5,
+      ])
+      ->setDisplayConfigurable('view', TRUE);
 
     $fields['stay'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Stay'))
@@ -512,6 +559,22 @@ class Payment extends ContentEntityBase implements PaymentInterface {
     $fields['stay_day'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Stay day'))
       ->setSetting('max_length', 255);
+
+    $fields['pst'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('PST'))
+      ->setSetting('max_length', 128);
+
+    $fields['accept_nationality'] = BaseFieldDefinition::create('boolean')
+      ->setLabel(t('Accept nationality'))
+      ->setSetting('max_length', 32);
+
+    $fields['accept_other'] = BaseFieldDefinition::create('boolean')
+      ->setLabel(t('Accept other'))
+      ->setSetting('max_length', 32);
+
+    $fields['accept_photo'] = BaseFieldDefinition::create('boolean')
+      ->setLabel(t('Accept photo'))
+      ->setSetting('max_length', 32);
 
     $fields['charge_total'] = BaseFieldDefinition::create('float')
       ->setLabel(t('Amount'))
@@ -552,7 +615,7 @@ class Payment extends ContentEntityBase implements PaymentInterface {
       ->setLabel(t('Approval Code'))
       ->setSetting('max_length', 128);
 
-    $fields['currency'] = BaseFieldDefinition::create('integer')
+    $fields['currency'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Currency'))
       ->setSetting('max_length', 3);
 

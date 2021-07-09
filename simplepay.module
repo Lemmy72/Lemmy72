@@ -2,6 +2,8 @@
 
 use Drupal\node\Entity\Node;
 use Drupal\simplepay\Form\SettingsForm;
+use Drupal\simplepay\Form\PaymentForm;
+use Drupal\Core\Entity\EntityStorageException;
 
 function simplepay_preprocess_node(array &$variables) {
 
@@ -19,20 +21,28 @@ function simplepay_preprocess_node(array &$variables) {
       $variables['elements']['#node']->id() === $cancel_url_id ||
       $variables['elements']['#node']->id() === $timeout_url_id)
   ) {
-    $post = \Drupal::request()->request->all();
+    if ($variables['elements']['#node']->id() === $success_url_id) {
+      $r = \Drupal::request()->query->get('r');
+      $s = \Drupal::request()->query->get('s');
+      $response = PaymentForm::checkHash($r, $s);
 
-    /*if (!empty($post['chargetotal']) && !empty($post['currency'])
-      && !empty($post['txndatetime']) && !empty($post['approval_code'])
-      && !empty($post['response_hash'])) {
+      if ($response) {
 
-      $hash = DonateForm::notificationHash($post['chargetotal'],
-        $post['currency'],
-        $post['txndatetime'],
-        $post['approval_code']);
-
-      if ($hash === $post['response_hash']) {
-        _ga_donate_save_donate($post);
+        /** @var \Drupal\simplepay\Entity\Payment $payment */
+        $entity = \Drupal::entityTypeManager()->getStorage('payment');
+        $results = $entity->loadByProperties([
+          'transaction_id' => $response['t'],
+          'order_id' => $response['o'],
+        ]);
+        $payment = reset($results);
+        $payment->setStatus($response['e']);
+        try {
+          $payment->save();
+        } catch (EntityStorageException $e) {
+        }
       }
-    }*/
+
+    }
+
   }
 }
