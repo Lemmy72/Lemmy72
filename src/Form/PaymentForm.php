@@ -2,18 +2,20 @@
 
 namespace Drupal\simplepay\Form;
 
+use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
-use Drupal\Core\Ajax\InsertCommand;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Datetime\DateFormatter;
+use Drupal\Core\Entity\EntityMalformedException;
+use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Markup;
+use Drupal\simplepay\Entity\Payment;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Messenger\MessengerInterface;
-use Symfony\Component\HttpFoundation\JsonResponse;
 
 /**
  * Provide the Payment form.
@@ -79,102 +81,46 @@ class PaymentForm extends FormBase {
       $this->messenger->addMessage($this->t('Please fill out <a href=":settings" target="_blank">simplepay settings!</a>', [':settings' => '/admin/config/simplepay/settings']));
     }
     else {
-      $this->simplepayConfig = [
-        'HUF_MERCHANT' => $this->config->get('data')['huf_merchant'],
-        'HUF_SECRET_KEY' => $this->config->get('data')['huf_secret_key'],
-        'EUR_MERCHANT' => $this->config->get('data')['eur_merchant'],
-        'EUR_SECRET_KEY' => $this->config->get('data')['eur_secret_key'],
-        'USD_MERCHANT' => $this->config->get('data')['usd_merchant'],
-        'USD_SECRET_KEY' => $this->config->get('data')['usd_secret_key'],
-        'SANDBOX' => (bool) $this->config->get('environment') == 'Test',
-        'URLS_SUCCESS' => $this->entityTypeManager->getStorage('node')
-          ->load($this->config->get('data')['response_success_url'])
-          ->toUrl()
-          ->setAbsolute(TRUE)
-          ->toString(),
-        'URLS_FAIL' => $this->entityTypeManager->getStorage('node')
-          ->load($this->config->get('data')['response_fail_url'])
-          ->toUrl()
-          ->setAbsolute(TRUE)
-          ->toString(),
-        'URLS_CANCEL' => $this->entityTypeManager->getStorage('node')
-          ->load($this->config->get('data')['response_cancel_url'])
-          ->toUrl()
-          ->setAbsolute(TRUE)
-          ->toString(),
-        'URLS_TIMEOUT' => $this->entityTypeManager->getStorage('node')
-          ->load($this->config->get('data')['response_timeout_url'])
-          ->toUrl()
-          ->setAbsolute(TRUE)
-          ->toString(),
-        'GET_DATA' => (isset($_GET['r']) && isset($_GET['s'])) ? [
-          'r' => $_GET['r'],
-          's' => $_GET['s'],
-        ] : [],
-        'POST_DATA' => $_POST,
-        'SERVER_DATA' => $_SERVER,
-        'AUTOCHALLENGE' => TRUE,
-      ];
-
-      /*print "<pre>";
-      print_r($this->simplepayConfig);
-      print "</pre>";*/
-
-      require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
-
-      $trx = new \SimplePayStart;
-
-      $currency = 'HUF';
-      $trx->addData('currency', $currency);
-      $trx->addConfig($this->simplepayConfig);
-      $trx->addData('total', 3000);
-      $trx->addData('orderRef', str_replace([
-          '.',
-          ':',
-          '/',
-        ], "", @$_SERVER['SERVER_ADDR']) . @date("U", time()) . rand(1000, 9999));
-
-      // customer's registration mehod
-      // 01: guest
-      // 02: registered
-      // 05: third party
-      $trx->addData('threeDSReqAuthMethod', '02');
-      $trx->addData('customerEmail', 'sdk_test@otpmobil.com');
-      $trx->addData('language', 'HU');
-      $timeoutInSec = 600;
-      $timeout = @date("c", time() + $timeoutInSec);
-      $trx->addData('timeout', $timeout);
-      $trx->addData('methods', ['CARD']);
-      $trx->addData('url', $this->simplepayConfig['URLS_SUCCESS']);
-
-      $trx->addGroupData('urls', 'success', $this->simplepayConfig['URLS_SUCCESS']);
-      $trx->addGroupData('urls', 'fail', $this->simplepayConfig['URLS_FAIL']);
-      $trx->addGroupData('urls', 'cancel', $this->simplepayConfig['URLS_CANCEL']);
-      $trx->addGroupData('urls', 'timeout', $this->simplepayConfig['URLS_TIMEOUT']);
-
-
-      $trx->addGroupData('invoice', 'name', 'SimplePay V2 Tester');
-      //$trx->addGroupData('invoice', 'company', '');
-      $trx->addGroupData('invoice', 'country', 'hu');
-      $trx->addGroupData('invoice', 'state', 'Budapest');
-      $trx->addGroupData('invoice', 'city', 'Budapest');
-      $trx->addGroupData('invoice', 'zip', '1111');
-      $trx->addGroupData('invoice', 'address', 'Address 1');
-
-      $trx->formDetails['element'] = 'button';
-
-      /*
-      $trx->runStart();
-      print "API REQUEST";
-      print "<pre>";
-      print_r($trx->getTransactionBase());
-      print "</pre>";
-
-      print "API RESULT";
-      print "<pre>";
-      print_r($trx->getReturnData());
-      print "</pre>";
-      */
+      try {
+        $this->simplepayConfig = [
+          'HUF_MERCHANT' => $this->config->get('data')['huf_merchant'],
+          'HUF_SECRET_KEY' => $this->config->get('data')['huf_secret_key'],
+          'EUR_MERCHANT' => $this->config->get('data')['eur_merchant'],
+          'EUR_SECRET_KEY' => $this->config->get('data')['eur_secret_key'],
+          'USD_MERCHANT' => $this->config->get('data')['usd_merchant'],
+          'USD_SECRET_KEY' => $this->config->get('data')['usd_secret_key'],
+          'SANDBOX' => (bool) $this->config->get('environment') == 'Test',
+          'URLS_SUCCESS' => $this->entityTypeManager->getStorage('node')
+            ->load($this->config->get('data')['response_success_url'])
+            ->toUrl()
+            ->setAbsolute(TRUE)
+            ->toString(),
+          'URLS_FAIL' => $this->entityTypeManager->getStorage('node')
+            ->load($this->config->get('data')['response_fail_url'])
+            ->toUrl()
+            ->setAbsolute(TRUE)
+            ->toString(),
+          'URLS_CANCEL' => $this->entityTypeManager->getStorage('node')
+            ->load($this->config->get('data')['response_cancel_url'])
+            ->toUrl()
+            ->setAbsolute(TRUE)
+            ->toString(),
+          'URLS_TIMEOUT' => $this->entityTypeManager->getStorage('node')
+            ->load($this->config->get('data')['response_timeout_url'])
+            ->toUrl()
+            ->setAbsolute(TRUE)
+            ->toString(),
+          'GET_DATA' => (isset($_GET['r']) && isset($_GET['s'])) ? [
+            'r' => $_GET['r'],
+            's' => $_GET['s'],
+          ] : [],
+          'POST_DATA' => $_POST,
+          'SERVER_DATA' => $_SERVER,
+          'AUTOCHALLENGE' => TRUE,
+        ];
+      } catch (InvalidPluginDefinitionException|PluginNotFoundException|EntityMalformedException $e) {
+        $this->logger('simplepay')->warning($e->getMessage());
+      }
     }
 
   }
@@ -201,14 +147,16 @@ class PaymentForm extends FormBase {
    * {@inheritdoc}
    */
   public function getFormId() {
-    return 'payment_form';
+    return 'pte_payment_form';
   }
 
   /**
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $form['#tree'] = TRUE;
+    //TODO PST menteni
+    //Ellenorzni hogy a sikeres megrendelesek szama kisebb-e mint a letszam az adott karnal
+    //foglalasi idopont ellenorzese az adott karnal
 
     $form['description'] = [
       '#type' => 'item',
@@ -231,860 +179,249 @@ class PaymentForm extends FormBase {
       ],
     ];
 
-    $selected_faculty = $form_state->getUserInput()['faculty'];
+    $selected_faculty = $form_state->getValues()['faculty'];
 
     $form['info'] = [
       '#type' => 'item',
-      '#markup' => t('<strong>A tábor ideje: @date<br>A tábor helyszíne: @location<br>Jelentkezési időszak: @apply<br>Tábor díja: @price</strong>',
+      '#markup' => $this->t('<strong>A tábor ideje: @date<br>A tábor helyszíne: @location<br>Jelentkezési időszak: @apply<br>Tábor díja: @price</strong>',
         [
-          '@date' => $faculties_data[$selected_faculty]['start_date'] . ' - ' . $faculties_data[$selected_faculty]['end_date'],
-          '@location' => $faculties_data[$selected_faculty]['location'],
-          '@apply' => $faculties_data[$selected_faculty]['apply_start_date'] . ' - ' . $faculties_data[$selected_faculty]['apply_end_date'],
-          '@price' => $faculties_data[$selected_faculty]['price'] . ' Ft.',
+          '@date' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['start_date'] . ' - ' . $faculties_data[$selected_faculty]['end_date'] : '',
+          '@location' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['location'] : '',
+          '@apply' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['apply_start_date'] . ' - ' . $faculties_data[$selected_faculty]['apply_end_date'] : '',
+          '@price' => is_numeric($selected_faculty) ? $faculties_data[$selected_faculty]['price'] . ' Ft.' : '',
         ]),
     ];
 
-    $form['full_name'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Full name"),
-      '#title' => $this->t("Full name"),
-    ];
+    $can_apply = TRUE;
+    if ($faculties_data[$selected_faculty]['apply_start_date'] && $faculties_data[$selected_faculty]['apply_end_date']) {
+      $apply_start_ts = strtotime($faculties_data[$selected_faculty]['apply_start_date'] . ' 00:00:00');
+      $apply_end_ts = strtotime($faculties_data[$selected_faculty]['apply_end_date'] . ' 23:59:59');
+      $current_time = time();
+      if ($current_time < $apply_start_ts || $current_time > $apply_end_ts) {
+        $can_apply = FALSE;
+        $this->messenger->addMessage($this->t('Apply is note enabled, you can apply between @start and @end',
+          ['@start' => $faculties_data[$selected_faculty]['apply_start_date'], '@end' => $faculties_data[$selected_faculty]['apply_end_date']]));
+      }
+    }
 
-    $form['place_of_birth'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Place of birth"),
-      '#title' => $this->t("Place of birth"),
-    ];
+    if ($can_apply) {
+      $form['full_name'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Full name"),
+        '#title' => $this->t("Full name"),
+      ];
 
-    $form['date_of_birth'] = [
-      '#type' => 'datelist',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Date of birth"),
-      '#title' => $this->t("Date of birth"),
-      '#date_part_order' => ['year', 'month', 'day'],
-      '#date_year_range' => '1990:2005',
-    ];
+      $form['place_of_birth'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Place of birth"),
+        '#title' => $this->t("Place of birth"),
+      ];
 
-    $form['mothers_name'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Mother's name"),
-      '#title' => $this->t("Mother's name"),
-    ];
+      $form['date_of_birth'] = [
+        '#type' => 'datelist',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Date of birth"),
+        '#title' => $this->t("Date of birth"),
+        '#date_part_order' => ['year', 'month', 'day'],
+        '#date_year_range' => '1990:2005',
+      ];
 
-    $form['email'] = [
-      '#type' => 'email',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Email address"),
-      '#title' => $this->t("Email address"),
-    ];
+      $form['mothers_name'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Mother's name"),
+        '#title' => $this->t("Mother's name"),
+      ];
 
-    $form['nationality'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Nationality'),
-      '#required' => TRUE,
-    ];
+      $form['email'] = [
+        '#type' => 'email',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Email address"),
+        '#title' => $this->t("Email address"),
+      ];
 
-    $form['phone'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Enter a phone number we can contact you with"),
-      '#title' => $this->t("Telephone number"),
-    ];
+      $form['nationality'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Nationality'),
+        '#required' => TRUE,
+      ];
 
-    $form['postcode'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Enter your postcode"),
-      '#title' => $this->t("Postcode"),
-    ];
+      $form['phone'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Enter a phone number we can contact you with"),
+        '#title' => $this->t("Telephone number"),
+      ];
 
-    $form['city'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Enter name of your city or town"),
-      '#title' => $this->t("City / Town"),
-    ];
+      $form['postcode'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Enter your postcode"),
+        '#title' => $this->t("Postcode"),
+      ];
 
-    $form['street'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Enter your number and street name"),
-      '#title' => $this->t("Number / Street name"),
-    ];
+      $form['city'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Enter name of your city or town"),
+        '#title' => $this->t("City / Town"),
+      ];
 
-    $form['major'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Szak/szakirány/képzési központ/képzési rend'),
-      '#required' => TRUE,
-    ];
+      $form['street'] = [
+        '#type' => 'textfield',
+        '#required' => TRUE,
+        '#placeholder' => $this->t("Enter your number and street name"),
+        '#title' => $this->t("Number / Street name"),
+      ];
 
-    $form['etk_city'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Melyik városban fogsz tanulni?'),
-      '#options' => [
-        'Pécs' => $this->t('Pécs'),
-        'Kaposvár' => $this->t('Kaposvár'),
-        'Szombathely' => $this->t('Szombathely'),
-        'Zalaegerszeg' => $this->t('Zalaegerszeg'),
-        'Zombor' => $this->t('Zombor'),
-      ],
-      '#required' => TRUE,
-      '#states' => ['visible' => ['select[name="faculty"]' => ['value' => '4']]],
-    ];
+      $form['major'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Szak/szakirány/képzési központ/képzési rend'),
+        '#required' => TRUE,
+      ];
 
-    $form['notified'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Szükség esetén értesítendő személy telefonszáma (szülő, gondviselő)'),
-      '#description' => $this->t('Amennyiben szeretnéd, hogy szükség esetén értesítsünk egy általad megjelölt személyt (szülőt, gondviselőt), kérlek tüntesd fel elérhetőségüket!'),
-      '#required' => FALSE,
-    ];
+      $form['etk_city'] = [
+        '#type' => 'select',
+        '#title' => $this->t('Melyik városban fogsz tanulni?'),
+        '#options' => [
+          '' => $this->t('- Select -'),
+          'Pécs' => $this->t('Pécs'),
+          'Kaposvár' => $this->t('Kaposvár'),
+          'Szombathely' => $this->t('Szombathely'),
+          'Zalaegerszeg' => $this->t('Zalaegerszeg'),
+          'Zombor' => $this->t('Zombor'),
+        ],
+        '#states' => ['visible' => ['select[name="faculty"]' => ['value' => '4']]],
+      ];
 
-    $form['allergy'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Allergia, egyéb betegség'),
-      '#description' => $this->t('Amennyiben szeretnéd biztosítani, hogy a Gólyatábor területén tartózkodó egészségügyi ellátást nyújtó személyzet  gyógyszerek és gyógyászati segédeszközök tekintetében a legfelkészültebben tudja végezni feladatát, kérlek előzetesen tájékoztass minket ismert allergiáidról, betegségeidről! Az allergia/betegség előzetes bejelentése nagyban hozzájárul az egészségügyi személyzet hatékony felkészüléséhez.'),
-      '#required' => FALSE,
-    ];
+      $form['notified'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Szükség esetén értesítendő személy telefonszáma (szülő, gondviselő)'),
+        '#description' => $this->t('Amennyiben szeretnéd, hogy szükség esetén értesítsünk egy általad megjelölt személyt (szülőt, gondviselőt), kérlek tüntesd fel elérhetőségüket!'),
+        '#required' => FALSE,
+      ];
 
-    $form['meal'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Étkezési igény/érzékenység'),
-      '#description' => $this->t('Amennyiben szeretnéd, hogy speciális étkezési igényednek megfelelő ellátást biztosítsunk Neked, kérlek írd le ételallergiád, egyéb étkezési igényed!'),
-      '#required' => FALSE,
-    ];
+      $form['allergy'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Allergia, egyéb betegség'),
+        '#description' => $this->t('Amennyiben szeretnéd biztosítani, hogy a Gólyatábor területén tartózkodó egészségügyi ellátást nyújtó személyzet  gyógyszerek és gyógyászati segédeszközök tekintetében a legfelkészültebben tudja végezni feladatát, kérlek előzetesen tájékoztass minket ismert allergiáidról, betegségeidről! Az allergia/betegség előzetes bejelentése nagyban hozzájárul az egészségügyi személyzet hatékony felkészüléséhez.'),
+        '#required' => FALSE,
+      ];
 
-    $form['t_shirt_size'] = [
-      '#type' => 'select',
-      '#title' => $this->t('T-Shirt size'),
-      '#description' => $this->t('Amennyiben szeretnéd, hogy mérethelyes pólóval készülhessünk számodra, úgy kérlek tüntesd fel pólóméreted! Természetesen, ha nem szeretnéd megadni, akkor is biztosítunk Neked pólót, de ez esetben a mérethelyességet nem tudjuk garantálni.'),
-      '#options' => [
-        'S' => $this->t('S'),
-        'M' => $this->t('M'),
-        'L' => $this->t('L'),
-        'XL' => $this->t('XL'),
-        'XXL' => $this->t('XXL'),
-        'XXXL' => $this->t('XXXL'),
-      ],
-    ];
+      $form['meal'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Étkezési igény/érzékenység'),
+        '#description' => $this->t('Amennyiben szeretnéd, hogy speciális étkezési igényednek megfelelő ellátást biztosítsunk Neked, kérlek írd le ételallergiád, egyéb étkezési igényed!'),
+        '#required' => FALSE,
+      ];
 
-    $form['stay'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Meddig maradsz a táborban?'),
-      '#options' => [
-        '1' => $this->t('Végig'),
-        '2' => $this->t('Nem végig'),
-      ],
-      '#required' => TRUE,
-    ];
+      $form['t_shirt_size'] = [
+        '#type' => 'select',
+        '#title' => $this->t('T-Shirt size'),
+        '#description' => $this->t('Amennyiben szeretnéd, hogy mérethelyes pólóval készülhessünk számodra, úgy kérlek tüntesd fel pólóméreted! Természetesen, ha nem szeretnéd megadni, akkor is biztosítunk Neked pólót, de ez esetben a mérethelyességet nem tudjuk garantálni.'),
+        '#options' => [
+          'S' => $this->t('S'),
+          'M' => $this->t('M'),
+          'L' => $this->t('L'),
+          'XL' => $this->t('XL'),
+          'XXL' => $this->t('XXL'),
+          'XXXL' => $this->t('XXXL'),
+        ],
+      ];
 
-    $form['stay_day'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Meddig maradsz a táborban?'),
-      '#required' => TRUE,
-      '#states' => ['visible' => ['select[name="stay"]' => ['value' => '2']]],
-    ];
+      $form['stay'] = [
+        '#type' => 'select',
+        '#title' => $this->t('Meddig maradsz a táborban?'),
+        '#options' => [
+          '1' => $this->t('Végig'),
+          '2' => $this->t('Nem végig'),
+        ],
+        '#required' => TRUE,
+      ];
 
-    $form['accept_nationality'] = [
-      '#type' => 'checkbox',
-      '#title' => $this
-        ->t('Hozzájárulás az állampolgárság adat kezeléséhez'),
-      '#description' => $this->t('Hozzájárulásomat adom állampolgárságomra vonatkozó adat statisztikai célból történő kezeléséhez hozzájárulásom visszavonásáig.'),
-    ];
+      $form['stay_day'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Meddig maradsz a táborban?'),
+        '#states' => ['visible' => ['select[name="stay"]' => ['value' => '2']]],
+      ];
 
-    $form['accept_other'] = [
-      '#type' => 'checkbox',
-      '#title' => $this
-        ->t('Hozzájárulás megbetegedés, pólóméret, szülő/gondviselő telefonszáma, étkezési igény adatok kezeléséhez'),
-      '#description' => $this->t('Hozzájárulásomat adom allergiás és egyéb megbetegedésemre, pólóméretemre, szülő/gondviselő telefonszámára/étkezési igényre vonatkozó adatok kezeléséhez - azokra vonatkozóan, mely információkat jelen nyilatkozaton feltüntettem - extra szolgáltatások nyújtása céljából, hozzájárulásom visszavonásáig, de legfeljebb a Gólyatábor rendezvény végéig.'),
-    ];
+      $form['accept_nationality'] = [
+        '#type' => 'checkbox',
+        '#title' => $this
+          ->t('Hozzájárulás az állampolgárság adat kezeléséhez'),
+        '#description' => $this->t('Hozzájárulásomat adom állampolgárságomra vonatkozó adat statisztikai célból történő kezeléséhez hozzájárulásom visszavonásáig.'),
+      ];
 
-    $form['accept_photo'] = [
-      '#type' => 'checkbox',
-      '#title' => $this
-        ->t('Hozzájárulás fotó és videófelvételek készítéséhez'),
-      '#description' => $this->t('Hozzájárulásomat adom, hogy a Gólyatábor rendezvény során fotó és videófelvételeket készítsenek rólam promóciós és marketing célból, és azokat a Gólyatábor befejezésétől számított egy éven át kezeljék, felhasználják.'),
-    ];
+      $form['accept_other'] = [
+        '#type' => 'checkbox',
+        '#title' => $this
+          ->t('Hozzájárulás megbetegedés, pólóméret, szülő/gondviselő telefonszáma, étkezési igény adatok kezeléséhez'),
+        '#description' => $this->t('Hozzájárulásomat adom allergiás és egyéb megbetegedésemre, pólóméretemre, szülő/gondviselő telefonszámára/étkezési igényre vonatkozó adatok kezeléséhez - azokra vonatkozóan, mely információkat jelen nyilatkozaton feltüntettem - extra szolgáltatások nyújtása céljából, hozzájárulásom visszavonásáig, de legfeljebb a Gólyatábor rendezvény végéig.'),
+      ];
 
-    $form['accept_privacy'] = [
-      '#type' => 'checkbox',
-      '#title' => $this
-        ->t('Adatkezelés'),
-      '#description' => $this->t('A részletes adatkezelési tájékoztatót elolvastam és az abban foglaltakat elfogadom.'),
-      '#required' => TRUE,
-    ];
+      $form['accept_photo'] = [
+        '#type' => 'checkbox',
+        '#title' => $this
+          ->t('Hozzájárulás fotó és videófelvételek készítéséhez'),
+        '#description' => $this->t('Hozzájárulásomat adom, hogy a Gólyatábor rendezvény során fotó és videófelvételeket készítsenek rólam promóciós és marketing célból, és azokat a Gólyatábor befejezésétől számított egy éven át kezeljék, felhasználják.'),
+        '#required' => TRUE,
+      ];
 
-    $form['accept_rules'] = [
-      '#type' => 'checkbox',
-      '#title' => $this
-        ->t('Nyilatkozat a házirend elfogadásáról'),
-      '#description' => $this->t('Nyilatkozom, hogy a rendezvény etikai kódexét és házirendjét, valamint a befogadó intézmény házirendjét megismertem, annak tartalmát magamra nézve kötelezőnek tekintem.'),
-      '#required' => TRUE,
-    ];
+      $form['accept_privacy'] = [
+        '#type' => 'checkbox',
+        '#title' => $this
+          ->t('Adatkezelés'),
+        '#description' => $this->t('A részletes adatkezelési tájékoztatót elolvastam és az abban foglaltakat elfogadom.'),
+        '#required' => TRUE,
+      ];
 
-    $form['accept_responsibility'] = [
-      '#type' => 'checkbox',
-      '#title' => $this
-        ->t('Nyilatkozat a személyi és anyagi felelősségről'),
-      '#description' => $this->t('Nyilatkozom, hogy a rendezvényen saját személyi és anyagi felelősségem tudatában veszek részt.'),
-      '#required' => TRUE,
-    ];
+      $form['accept_rules'] = [
+        '#type' => 'checkbox',
+        '#title' => $this
+          ->t('Nyilatkozat a házirend elfogadásáról'),
+        '#description' => $this->t('Nyilatkozom, hogy a rendezvény etikai kódexét és házirendjét, valamint a befogadó intézmény házirendjét megismertem, annak tartalmát magamra nézve kötelezőnek tekintem.'),
+        '#required' => TRUE,
+      ];
 
-    $form['actions']['#type'] = 'actions';
-    $form['actions']['submit'] = [
-      '#type' => 'submit',
-      '#value' => $this->t('Send'),
-      '#button_type' => 'primary',
-    ];
+      $form['accept_responsibility'] = [
+        '#type' => 'checkbox',
+        '#title' => $this
+          ->t('Nyilatkozat a személyi és anyagi felelősségről'),
+        '#description' => $this->t('Nyilatkozom, hogy a rendezvényen saját személyi és anyagi felelősségem tudatában veszek részt.'),
+        '#required' => TRUE,
+      ];
+
+      $form['actions']['#type'] = 'actions';
+      $form['actions']['submit'] = [
+        '#type' => 'submit',
+        '#value' => $this->t('Send'),
+        '#button_type' => 'primary',
+        '#attributes' => [
+          'disabled' => $can_apply,
+        ]
+      ];
+    }
 
     return $form;
   }
 
 
   /**
-   * Builds the second step form (page 2 - Payment).
-   *
-   * @param array $form
-   *   An associative array containing the structure of the form.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
-   *
-   * @return array
-   *   The render array defining the elements of the form.
-   *
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-   * @throws \Drupal\Core\Entity\EntityMalformedException
+   * {@inheritdoc}
    */
-  public function paymentForm(array &$form, FormStateInterface $form_state) {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
 
-    $environment = $this->config->get('environment');
-
-    $charge_total = number_format((float) $form_state->getValue('chargetotal'), 2, '.', '');
-    $currency = $this->config->get('global')['currency_code'];
-    $txndatetime = $this->getDateTime();
-
-    $form['#attributes']['class'][] = 'donate';
-    $form['#attributes']['class'][] = 'payment';
-
-    $form['steps'] = [
-      '#type' => 'markup',
-      '#markup' => '<ul class="donate__steps">' .
-        '<li class="donate__step donate__step--disabled">' . $this->t("Your details") . '</li>' .
-        '<li class="donate__step donate__step--selected">' . $this->t("Payment details") . '</li>' .
-        '</ul>',
-    ];
-
-    $form['#action'] = $this->config->get('environments')[$environment]['api_url'];
-
-    // Hidden fields.
-    $form['txntype'] = [
-      '#type' => 'hidden',
-      '#value' => 'sale',
-    ];
-
-    $form['timezone'] = [
-      '#type' => 'hidden',
-      '#value' => date_default_timezone_get(),
-    ];
-
-    $form['txndatetime'] = [
-      '#type' => 'hidden',
-      '#value' => $txndatetime,
-    ];
-
-    $form['hash_algorithm'] = [
-      '#type' => 'hidden',
-      '#value' => 'SHA256',
-    ];
-
-    $form['hash'] = [
-      '#type' => 'hidden',
-      '#value' => $this->createHash($charge_total, $currency, $txndatetime),
-    ];
-
-    $form['storename'] = [
-      '#type' => 'hidden',
-      '#value' => $this->config->get('environments')[$environment]['store_name'],
-    ];
-
-    $form['mode'] = [
-      '#type' => 'hidden',
-      '#value' => 'payplus',
-    ];
-
-    $form['chargetotal'] = [
-      '#type' => 'hidden',
-      '#value' => $charge_total,
-    ];
-
-    $form['currency'] = [
-      '#type' => 'hidden',
-      '#value' => $currency,
-    ];
-
-    $form['responseFailURL'] = [
-      '#type' => 'hidden',
-      '#value' => $this->entityTypeManager->getStorage('node')
-        ->load($this->config->get('global')['response_fail_url'])
-        ->toUrl()
-        ->setAbsolute(TRUE)
-        ->toString(),
-    ];
-
-    $form['responseSuccessURL'] = [
-      '#type' => 'hidden',
-      '#value' => $this->entityTypeManager->getStorage('node')
-        ->load($this->config->get('global')['response_success_url'])
-        ->toUrl()
-        ->setAbsolute(TRUE)
-        ->toString(),
-    ];
-
-    $form['bcompany'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('company_name'),
-    ];
-
-    $form['first_name'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('first_name'),
-    ];
-
-    $form['last_name'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('last_name'),
-    ];
-
-    $form['job_title'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('job_title'),
-    ];
-
-    $form['commission_ref'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('commission_ref'),
-    ];
-
-    $form['gamble_aware_donor_ref'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('gamble_aware_donor_ref'),
-    ];
-
-    $form['county'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('county'),
-    ];
-
-    $form['other'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('other'),
-    ];
-
-    $form['newsletter'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('newsletter'),
-    ];
-
-    $form['bname'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('first_name') . ' ' . $form_state->getValue('last_name'),
-    ];
-
-    $form['baddr1'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('street'),
-    ];
-
-    $form['bcity'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('city'),
-    ];
-
-    $form['bzip'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('postcode'),
-    ];
-
-    $form['bcountry'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('country'),
-    ];
-
-    $form['phone'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('telephone_number'),
-    ];
-
-    $form['email'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('email'),
-    ];
-
-    $form['parentCompany'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('parent_company_name'),
-    ];
-
-    $form['donatingonbehalf'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('donating_on_behalf_of'),
-    ];
-
-    $form['companytrade'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('company_trade'),
-    ];
-
-    $form['title'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('title'),
-    ];
-
-    $form['website'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('company_website'),
-    ];
-
-    $form['donationbased'] = [
-      '#type' => 'hidden',
-      '#value' => $form_state->getValue('donation_based'),
-    ];
-
-    $form['paymentMethod'] = [
-      '#type' => 'hidden',
-    ];
-
-    $form['full_bypass'] = [
-      '#type' => 'hidden',
-      '#value' => 'false',
-    ];
-
-    $form['authenticateTransaction'] = [
-      '#type' => 'hidden',
-      '#value' => 'true',
-    ];
-
-    $form['threeDSRequestorChallengeIndicator'] = [
-      '#type' => 'hidden',
-      '#value' => '01',
-    ];
-
-    // Card detail fields.
-    $form['card-name'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t("Name on Card"),
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Name on Card"),
-    ];
-
-    $form['cardnumber'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t("Card Number"),
-      '#required' => TRUE,
-      '#placeholder' => $this->t("Card Number (XXXX-XXXX-XXXX-XXXX)"),
-    ];
-
-    $form['expiry_date'] = [
-      '#type' => 'fieldset',
-      '#title' => $this->t("Expiry date and CVV"),
-      '#attributes' => [
-        'class' => [
-          'expiry-date-fieldset',
-        ],
-      ],
-    ];
-
-    $expmonth_options = [];
-    for ($i = 1; $i <= 12; $i++) {
-      $expmonth_options[sprintf('%02d', $i)] = sprintf('%02d', $i);
+    if ((int) $form_state->getValues()['stay'] === 2 && empty($form_state->getValues()['stay_day'])) {
+      $form_state->setErrorByName('stay_day', $this->t('Ha nem végig maradsz akkor ez kötelező.'));
     }
 
-    $form['expiry_date']['expmonth'] = [
-      '#type' => 'select',
-      '#required' => TRUE,
-      '#options' => $expmonth_options,
-    ];
-
-    $expyear_options = [];
-    for ($year = intval(date('Y')); $year <= intval(date('Y')) + 9; $year++) {
-      $expyear_options[$year] = $year;
+    if ((int) $form_state->getValues()['faculty'] === 4 && empty($form_state->getValues()['etk_city'])) {
+      $form_state->setErrorByName('etk_city', $this->t('ETK gólyatábor esetén kötelező.'));
     }
 
-    $form['expiry_date']['expyear'] = [
-      '#type' => 'select',
-      '#required' => TRUE,
-      '#options' => $expyear_options,
-    ];
-
-    $form['expiry_date']['cvm'] = [
-      '#type' => 'textfield',
-      '#required' => TRUE,
-      '#placeholder' => $this->t("CVV"),
-    ];
-
-    // Review.
-    $form['review'] = [
-      '#type' => 'fieldset',
-      '#title' => $this->t("Review Your Donation"),
-      '#attributes' => [
-        'class' => [
-          'review',
-        ],
-      ],
-    ];
-
-    $form['review']['review_donation_amount'] = [
-      '#type' => 'markup',
-      '#markup' => '<p class="review__row review__donation_amount">' .
-        $this->t("<span class='review__label'>@label:</span> <span class='review__value'>@value</span>", [
-          '@label' => $this->t("Your donation amount"),
-          '@value' => '£' . $charge_total,
-        ]) .
-        '</p>',
-    ];
-
-    $form['review']['review_name'] = [
-      '#type' => 'markup',
-      '#markup' => '<p class="review__row review__donation_amount">' .
-        $this->t("<span class='review__label'>@label:</span> <span class='review__value'>@value</span>", [
-          '@label' => $this->t("Name"),
-          '@value' => $form_state->getValue('first_name') . ' ' . $form_state->getValue('last_name'),
-        ]) .
-        '</p>',
-    ];
-
-    $form['review']['review_email'] = [
-      '#type' => 'markup',
-      '#markup' => '<p class="review__row review__donation_amount">' .
-        $this->t("<span class='review__label'>@label:</span> <span class='review__value'>@value</span>", [
-          '@label' => $this->t("Email address"),
-          '@value' => $form_state->getValue('email'),
-        ]) .
-        '</p>',
-    ];
-
-    $form['review']['review_company_name'] = [
-      '#type' => 'markup',
-      '#markup' => '<p class="review__row review__donation_amount">' .
-        $this->t("<span class='review__label'>@label:</span> <span class='review__value'>@value</span>", [
-          '@label' => $this->t("Company"),
-          '@value' => $form_state->getValue('company_name'),
-        ]) .
-        '</p>',
-    ];
-
-    $form['submit'] = [
-      '#type' => 'submit',
-      '#button_type' => 'primary',
-      '#value' => $this->t('Donate'),
-    ];
-
-    return $form;
-  }
-
-  /**
-   * Provides custom submission handler for 'Back' button (page 2).
-   *
-   * @param array $form
-   *   An associative array containing the structure of the form.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
-   */
-  public function paymentBack(array &$form, FormStateInterface $form_state) {
-    $form_state
-      // Restore values for the first step.
-      ->setValues($form_state->get('page_values'))
-      ->set('page_num', 1)
-      // Since we have logic in our buildForm() method, we have to tell the form
-      // builder to rebuild the form. Otherwise, even though we set 'page_num'
-      // to 1, the AJAX-rendered form will still show page 2.
-      ->setRebuild(TRUE);
-  }
-
-  /**
-   * Get country list with country codes.
-   *
-   * @return array
-   *   Country list with country codes.
-   */
-  protected function getCountryOptions() {
-    return [
-      "AF" => "Afghanistan",
-      "AL" => "Albania",
-      "DZ" => "Algeria",
-      "AS" => "American Samoa",
-      "AD" => "Andorra",
-      "AO" => "Angola",
-      "AI" => "Anguilla",
-      "AQ" => "Antarctica",
-      "AG" => "Antigua and Barbuda",
-      "AR" => "Argentina",
-      "AM" => "Armenia",
-      "AW" => "Aruba",
-      "AU" => "Australia",
-      "AT" => "Austria",
-      "AZ" => "Azerbaijan",
-      "BS" => "Bahamas",
-      "BH" => "Bahrain",
-      "BD" => "Bangladesh",
-      "BB" => "Barbados",
-      "BY" => "Belarus",
-      "BE" => "Belgium",
-      "BZ" => "Belize",
-      "BJ" => "Benin",
-      "BM" => "Bermuda",
-      "BT" => "Bhutan",
-      "BO" => "Bolivia",
-      "BA" => "Bosnia and Herzegovina",
-      "BW" => "Botswana",
-      "BV" => "Bouvet Island",
-      "BR" => "Brazil",
-      "BQ" => "British Antarctic Territory",
-      "IO" => "British Indian Ocean Territory",
-      "VG" => "British Virgin Islands",
-      "BN" => "Brunei",
-      "BG" => "Bulgaria",
-      "BF" => "Burkina Faso",
-      "BI" => "Burundi",
-      "KH" => "Cambodia",
-      "CM" => "Cameroon",
-      "CA" => "Canada",
-      "CT" => "Canton and Enderbury Islands",
-      "CV" => "Cape Verde",
-      "KY" => "Cayman Islands",
-      "CF" => "Central African Republic",
-      "TD" => "Chad",
-      "CL" => "Chile",
-      "CN" => "China",
-      "CX" => "Christmas Island",
-      "CC" => "Cocos [Keeling] Islands",
-      "CO" => "Colombia",
-      "KM" => "Comoros",
-      "CG" => "Congo - Brazzaville",
-      "CD" => "Congo - Kinshasa",
-      "CK" => "Cook Islands",
-      "CR" => "Costa Rica",
-      "HR" => "Croatia",
-      "CU" => "Cuba",
-      "CY" => "Cyprus",
-      "CZ" => "Czech Republic",
-      "CI" => "Côte d’Ivoire",
-      "DK" => "Denmark",
-      "DJ" => "Djibouti",
-      "DM" => "Dominica",
-      "DO" => "Dominican Republic",
-      "NQ" => "Dronning Maud Land",
-      "DD" => "East Germany",
-      "EC" => "Ecuador",
-      "EG" => "Egypt",
-      "SV" => "El Salvador",
-      "GQ" => "Equatorial Guinea",
-      "ER" => "Eritrea",
-      "EE" => "Estonia",
-      "ET" => "Ethiopia",
-      "FK" => "Falkland Islands",
-      "FO" => "Faroe Islands",
-      "FJ" => "Fiji",
-      "FI" => "Finland",
-      "FR" => "France",
-      "GF" => "French Guiana",
-      "PF" => "French Polynesia",
-      "TF" => "French Southern Territories",
-      "FQ" => "French Southern and Antarctic Territories",
-      "GA" => "Gabon",
-      "GM" => "Gambia",
-      "GE" => "Georgia",
-      "DE" => "Germany",
-      "GH" => "Ghana",
-      "GI" => "Gibraltar",
-      "GR" => "Greece",
-      "GL" => "Greenland",
-      "GD" => "Grenada",
-      "GP" => "Guadeloupe",
-      "GU" => "Guam",
-      "GT" => "Guatemala",
-      "GG" => "Guernsey",
-      "GN" => "Guinea",
-      "GW" => "Guinea-Bissau",
-      "GY" => "Guyana",
-      "HT" => "Haiti",
-      "HM" => "Heard Island and McDonald Islands",
-      "HN" => "Honduras",
-      "HK" => "Hong Kong SAR China",
-      "HU" => "Hungary",
-      "IS" => "Iceland",
-      "IN" => "India",
-      "ID" => "Indonesia",
-      "IR" => "Iran",
-      "IQ" => "Iraq",
-      "IE" => "Ireland",
-      "IM" => "Isle of Man",
-      "IL" => "Israel",
-      "IT" => "Italy",
-      "JM" => "Jamaica",
-      "JP" => "Japan",
-      "JE" => "Jersey",
-      "JT" => "Johnston Island",
-      "JO" => "Jordan",
-      "KZ" => "Kazakhstan",
-      "KE" => "Kenya",
-      "KI" => "Kiribati",
-      "KW" => "Kuwait",
-      "KG" => "Kyrgyzstan",
-      "LA" => "Laos",
-      "LV" => "Latvia",
-      "LB" => "Lebanon",
-      "LS" => "Lesotho",
-      "LR" => "Liberia",
-      "LY" => "Libya",
-      "LI" => "Liechtenstein",
-      "LT" => "Lithuania",
-      "LU" => "Luxembourg",
-      "MO" => "Macau SAR China",
-      "MK" => "Macedonia",
-      "MG" => "Madagascar",
-      "MW" => "Malawi",
-      "MY" => "Malaysia",
-      "MV" => "Maldives",
-      "ML" => "Mali",
-      "MT" => "Malta",
-      "MH" => "Marshall Islands",
-      "MQ" => "Martinique",
-      "MR" => "Mauritania",
-      "MU" => "Mauritius",
-      "YT" => "Mayotte",
-      "FX" => "Metropolitan France",
-      "MX" => "Mexico",
-      "FM" => "Micronesia",
-      "MI" => "Midway Islands",
-      "MD" => "Moldova",
-      "MC" => "Monaco",
-      "MN" => "Mongolia",
-      "ME" => "Montenegro",
-      "MS" => "Montserrat",
-      "MA" => "Morocco",
-      "MZ" => "Mozambique",
-      "MM" => "Myanmar [Burma]",
-      "NA" => "Namibia",
-      "NR" => "Nauru",
-      "NP" => "Nepal",
-      "NL" => "Netherlands",
-      "AN" => "Netherlands Antilles",
-      "NT" => "Neutral Zone",
-      "NC" => "New Caledonia",
-      "NZ" => "New Zealand",
-      "NI" => "Nicaragua",
-      "NE" => "Niger",
-      "NG" => "Nigeria",
-      "NU" => "Niue",
-      "NF" => "Norfolk Island",
-      "KP" => "North Korea",
-      "VD" => "North Vietnam",
-      "MP" => "Northern Mariana Islands",
-      "NO" => "Norway",
-      "OM" => "Oman",
-      "PC" => "Pacific Islands Trust Territory",
-      "PK" => "Pakistan",
-      "PW" => "Palau",
-      "PS" => "Palestinian Territories",
-      "PA" => "Panama",
-      "PZ" => "Panama Canal Zone",
-      "PG" => "Papua New Guinea",
-      "PY" => "Paraguay",
-      "YD" => "People's Democratic Republic of Yemen",
-      "PE" => "Peru",
-      "PH" => "Philippines",
-      "PN" => "Pitcairn Islands",
-      "PL" => "Poland",
-      "PT" => "Portugal",
-      "PR" => "Puerto Rico",
-      "QA" => "Qatar",
-      "RO" => "Romania",
-      "RU" => "Russia",
-      "RW" => "Rwanda",
-      "RE" => "Réunion",
-      "BL" => "Saint Barthélemy",
-      "SH" => "Saint Helena",
-      "KN" => "Saint Kitts and Nevis",
-      "LC" => "Saint Lucia",
-      "MF" => "Saint Martin",
-      "PM" => "Saint Pierre and Miquelon",
-      "VC" => "Saint Vincent and the Grenadines",
-      "WS" => "Samoa",
-      "SM" => "San Marino",
-      "SA" => "Saudi Arabia",
-      "SN" => "Senegal",
-      "RS" => "Serbia",
-      "CS" => "Serbia and Montenegro",
-      "SC" => "Seychelles",
-      "SL" => "Sierra Leone",
-      "SG" => "Singapore",
-      "SK" => "Slovakia",
-      "SI" => "Slovenia",
-      "SB" => "Solomon Islands",
-      "SO" => "Somalia",
-      "ZA" => "South Africa",
-      "GS" => "South Georgia and the South Sandwich Islands",
-      "KR" => "South Korea",
-      "ES" => "Spain",
-      "LK" => "Sri Lanka",
-      "SD" => "Sudan",
-      "SR" => "Suriname",
-      "SJ" => "Svalbard and Jan Mayen",
-      "SZ" => "Swaziland",
-      "SE" => "Sweden",
-      "CH" => "Switzerland",
-      "SY" => "Syria",
-      "ST" => "São Tomé and Príncipe",
-      "TW" => "Taiwan",
-      "TJ" => "Tajikistan",
-      "TZ" => "Tanzania",
-      "TH" => "Thailand",
-      "TL" => "Timor-Leste",
-      "TG" => "Togo",
-      "TK" => "Tokelau",
-      "TO" => "Tonga",
-      "TT" => "Trinidad and Tobago",
-      "TN" => "Tunisia",
-      "TR" => "Turkey",
-      "TM" => "Turkmenistan",
-      "TC" => "Turks and Caicos Islands",
-      "TV" => "Tuvalu",
-      "UM" => "U.S. Minor Outlying Islands",
-      "PU" => "U.S. Miscellaneous Pacific Islands",
-      "VI" => "U.S. Virgin Islands",
-      "UG" => "Uganda",
-      "UA" => "Ukraine",
-      "SU" => "Union of Soviet Socialist Republics",
-      "AE" => "United Arab Emirates",
-      "GB" => "United Kingdom",
-      "US" => "United States",
-      "ZZ" => "Unknown or Invalid Region",
-      "UY" => "Uruguay",
-      "UZ" => "Uzbekistan",
-      "VU" => "Vanuatu",
-      "VA" => "Vatican City",
-      "VE" => "Venezuela",
-      "VN" => "Vietnam",
-      "WK" => "Wake Island",
-      "WF" => "Wallis and Futuna",
-      "EH" => "Western Sahara",
-      "YE" => "Yemen",
-      "ZM" => "Zambia",
-      "ZW" => "Zimbabwe",
-      "AX" => "Åland Islands",
-    ];
-  }
-
-  /**
-   * Get Date and time in the following format: Y:m:d-H:i:s.
-   */
-  protected function getDateTime() {
-    $timezone = date_default_timezone_get();
-    return $this->dateFormatter->format(time(), 'custom', 'Y:m:d-H:i:s', $timezone);
+    //$form_state->setRebuild(TRUE);
   }
 
   /**
@@ -1147,23 +484,96 @@ class PaymentForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $form_state->setRebuild(TRUE);
+
+    $faculties_data = $this->config->get('faculties');
+    $selected_faculty = $form_state->getValues()['faculty'];
+
+    require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
+
+    $trx = new \SimplePayStart;
+    $order_id = str_replace([
+        '.',
+        ':',
+        '/',
+      ], "", @$_SERVER['SERVER_ADDR']) . @date("U", time()) . rand(1000, 9999);
+
+    $currency = 'HUF';
+    $trx->addData('currency', $currency);
+    $trx->addConfig($this->simplepayConfig);
+    $trx->addData('total', 3000);
+    $trx->addData('orderRef', );
+
+    $trx->addData('threeDSReqAuthMethod', '02');
+    $trx->addData('customerEmail', 'sdk_test@otpmobil.com');
+    $trx->addData('language', 'HU');
+    $timeoutInSec = 600;
+    $timeout = @date("c", time() + $timeoutInSec);
+    $trx->addData('timeout', $timeout);
+    $trx->addData('methods', ['CARD']);
+    $trx->addData('url', $this->simplepayConfig['URLS_SUCCESS']);
+    $trx->addGroupData('urls', 'success', $this->simplepayConfig['URLS_SUCCESS']);
+    $trx->addGroupData('urls', 'fail', $this->simplepayConfig['URLS_FAIL']);
+    $trx->addGroupData('urls', 'cancel', $this->simplepayConfig['URLS_CANCEL']);
+    $trx->addGroupData('urls', 'timeout', $this->simplepayConfig['URLS_TIMEOUT']);
+
+
+    $trx->addGroupData('invoice', 'name', 'SimplePay V2 Tester');
+    //$trx->addGroupData('invoice', 'company', '');
+    $trx->addGroupData('invoice', 'country', 'hu');
+    $trx->addGroupData('invoice', 'state', 'Budapest');
+    $trx->addGroupData('invoice', 'city', 'Budapest');
+    $trx->addGroupData('invoice', 'zip', '1111');
+    $trx->addGroupData('invoice', 'address', 'Address 1');
+
+
+    /** @var \Drupal\Core\Datetime\DrupalDateTime $dateObject */
+    $dateObject = $form_state->getValue('date_of_birth');
+    $date_of_birth = date('Y-m-d', $dateObject->getTimestamp());
+
+    $payment = Payment::create([
+      'faculty' => $form_state->getValue('faculty'),
+      'full_name' => $form_state->getValue('full_name'),
+      'place_of_birth' => $form_state->getValue('place_of_birth'),
+      'date_of_birth' => $date_of_birth,
+      'mothers_name' => $form_state->getValue('mothers_name'),
+      'email' => $form_state->getValue('email'),
+      'nationality' => $form_state->getValue('nationality'),
+      'phone' => $form_state->getValue('phone'),
+      'postcode' => $form_state->getValue('postcode'),
+      'city' => $form_state->getValue('city'),
+      'street' => $form_state->getValue('street'),
+      'major' => $form_state->getValue('major'),
+      'etk_city' => $form_state->getValue('etk_city'),
+      'notified' => $form_state->getValue('notified'),
+      'allergy' => $form_state->getValue('allergy'),
+      'meal' => $form_state->getValue('meal'),
+      't_shirt_size' => $form_state->getValue('t_shirt_size'),
+      'stay' => $form_state->getValue('stay'),
+      'stay_day' => $form_state->getValue('stay_day'),
+      'charge_total' => $faculties_data[$selected_faculty]['price'],
+      //'hash' => $form_state->getValue('notified'),
+      'order_id' => $order_id,
+      //'transaction_id' => ,
+      'currency' => $currency,
+      'pst' => $faculties_data[$selected_faculty]['pst'],
+      'accept_nationality' => $form_state->getValue('accept_nationality'),
+      'accept_other' => $form_state->getValue('accept_other'),
+      'accept_photo' => $form_state->getValue('accept_photo'),
+    ]);
+
+    try {
+      $payment->save();
+    }
+    catch (EntityStorageException $e) {
+      $this->logger('simplepay')->warning($e->getMessage());
+    }
   }
 
   public function loadInfo(array &$form, FormStateInterface $form_state): AjaxResponse {
     $response = new AjaxResponse();
     $response->addCommand(new HtmlCommand('#edit-info', $form['info']));
+    $response->addCommand(new HtmlCommand('#edit-info', $form['info']));
     return $response;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function validateForm(array &$form, FormStateInterface $form_state) {
-    if ($form_state->getValues()['newsletter'] === NULL) {
-      $form_state->setErrorByName('newsletter', $this->t('Please let us know if you would like to receive updates from us.'));
-    }
-    $form_state->setRebuild(TRUE);
   }
 
 }
