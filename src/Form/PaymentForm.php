@@ -203,10 +203,20 @@ class PaymentForm extends FormBase {
       $apply_start_ts = strtotime($faculties_data[$selected_faculty]['apply_start_date'] . ' 00:00:00');
       $apply_end_ts = strtotime($faculties_data[$selected_faculty]['apply_end_date'] . ' 23:59:59');
       $current_time = time();
-      if ($current_time > $apply_start_ts && $current_time < $apply_end_ts) {
+
+      $entity = \Drupal::entityTypeManager()->getStorage('payment');
+      $results = $entity->loadByProperties([
+        'status' => 'SUCCESS',
+        'faculty' => $selected_faculty,
+      ]);
+
+      $count = count($results);
+
+      if ($current_time > $apply_start_ts &&
+        $current_time < $apply_end_ts &&
+        $count < $faculties_data[$selected_faculty]['participants']
+      ) {
         $can_apply = TRUE;
-        /*$this->messenger->addMessage($this->t('Apply is not enabled, you can apply between @start and @end',
-          ['@start' => $faculties_data[$selected_faculty]['apply_start_date'], '@end' => $faculties_data[$selected_faculty]['apply_end_date']]));*/
       }
     }
 
