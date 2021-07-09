@@ -181,7 +181,7 @@ class PaymentForm extends FormBase {
       ],
     ];
 
-    $selected_faculty = $form_state->getValues()['faculty'];
+    $selected_faculty = $form_state->getValues()['faculty'] ?? NULL;
     $info = '';
     if (is_numeric($selected_faculty)) {
       $info = $this->t('<strong>A tábor ideje: @date<br>A tábor helyszíne: @location<br>Jelentkezési időszak: @apply<br>Tábor díja: @price</strong>',
@@ -199,7 +199,7 @@ class PaymentForm extends FormBase {
     ];
 
     $can_apply = FALSE;
-    if ($faculties_data[$selected_faculty]['apply_start_date'] && $faculties_data[$selected_faculty]['apply_end_date']) {
+    if (is_numeric($selected_faculty) && $faculties_data[$selected_faculty]['apply_start_date'] && $faculties_data[$selected_faculty]['apply_end_date']) {
       $apply_start_ts = strtotime($faculties_data[$selected_faculty]['apply_start_date'] . ' 00:00:00');
       $apply_end_ts = strtotime($faculties_data[$selected_faculty]['apply_end_date'] . ' 23:59:59');
       $current_time = time();
@@ -426,11 +426,11 @@ class PaymentForm extends FormBase {
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
 
-    if ((int) $form_state->getValues()['stay'] === 2 && empty($form_state->getValues()['stay_day'])) {
+    if (isset($form_state->getValues()['stay']) && (int) $form_state->getValues()['stay'] === 2 && empty($form_state->getValues()['stay_day'])) {
       $form_state->setErrorByName('stay_day', $this->t('Ha nem végig maradsz akkor ez kötelező.'));
     }
 
-    if ((int) $form_state->getValues()['faculty'] === 4 && empty($form_state->getValues()['etk_city'])) {
+    if (isset($form_state->getValues()['faculty']) && (int) $form_state->getValues()['faculty'] === 4 && empty($form_state->getValues()['etk_city'])) {
       $form_state->setErrorByName('etk_city', $this->t('ETK gólyatábor esetén kötelező.'));
     }
   }
