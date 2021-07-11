@@ -1,5 +1,6 @@
 <?php
 
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\node\Entity\Node;
 use Drupal\simplepay\Form\SettingsForm;
 use Drupal\simplepay\Form\PaymentForm;
@@ -24,7 +25,10 @@ function simplepay_preprocess_node(array &$variables) {
     if ($variables['elements']['#node']->id() === $success_url_id) {
       $r = \Drupal::request()->query->get('r');
       $s = \Drupal::request()->query->get('s');
-      $response = PaymentForm::checkHash($r, $s);
+      $response = NULL;
+      if (!empty($r) && !empty($s)) {
+        $response = PaymentForm::checkHash($r, $s);
+      }
 
       if ($response) {
 
@@ -41,8 +45,63 @@ function simplepay_preprocess_node(array &$variables) {
         } catch (EntityStorageException $e) {
         }
       }
-
     }
-
   }
+}
+
+/**
+ * Implements hook_token_info().
+ */
+function simplepay_token_info() {
+
+  $info = [];
+
+  $info['types']['simplepay'] = [
+    'name' => 'Simplepay',
+    'description' => 'PTE Simplepay data.',
+  ];
+
+  $info['tokens']['simplepay'] = [
+    'price' => [
+      'name' => 'Simplepay price',
+      'description' => 'Simplepay price for result pages.',
+    ],
+    'order_id' => [
+      'name' => 'Simplepay order id',
+      'description' => 'Simplepay order id for result pages.',
+    ],
+    'transaction_id' => [
+      'name' => 'Simplepay transaction id',
+      'description' => 'Simplepay transaction id for result pages.',
+    ],
+  ];
+
+  return $info;
+}
+
+/**
+ * Implements hook_tokens().
+ */
+function simplepay_tokens($type, $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata) {
+  $replacements = [];
+  if ($type === 'simplepay') {
+    $tempStore = \Drupal::service('tempstore.private')->get('simplepay');
+    $bubbleable_metadata->setCacheMaxAge(0);
+    foreach ($tokens as $name => $original) {
+      switch ($name) {
+        case 'price':
+          $replacements[$original] = $tempStore->get('price');
+          break;
+
+        case 'order_id':
+          $replacements[$original] = $tempStore->get('order_id');
+          break;
+
+        case 'transaction_id':
+          $replacements[$original] = $tempStore->get('transaction_id');
+          break;
+      }
+    }
+  }
+  return $replacements;
 }

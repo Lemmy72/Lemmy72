@@ -7,13 +7,13 @@ use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Datetime\DateFormatter;
 use Drupal\Core\Entity\EntityMalformedException;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\TrustedRedirectResponse;
+use Drupal\Core\TempStore\PrivateTempStoreFactory;
 use Drupal\simplepay\Entity\Payment;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Messenger\MessengerInterface;
@@ -46,11 +46,11 @@ class PaymentForm extends FormBase {
   protected $entityTypeManager;
 
   /**
-   * Date Formatter service.
+   * Private temp store.
    *
-   * @var \Drupal\Core\Datetime\DateFormatter
+   * @var \Drupal\Core\TempStore\PrivateTempStoreFactory
    */
-  protected $dateFormatter;
+  protected $tempStore;
 
   /**
    * @var array
@@ -66,18 +66,18 @@ class PaymentForm extends FormBase {
    *   Config Factory service.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   Entity Type Manager service.
-   * @param \Drupal\Core\Datetime\DateFormatter $date_formatter
-   *   Date Formatter service.
+   * @param \Drupal\Core\TempStore\PrivateTempStoreFactory $temp_store
+   *   Temp store.
    */
   public function __construct(
     MessengerInterface $messenger,
     ConfigFactoryInterface $config_factory,
     EntityTypeManagerInterface $entity_type_manager,
-    DateFormatter $date_formatter) {
+    PrivateTempStoreFactory $temp_store) {
     $this->messenger = $messenger;
     $this->config = $config_factory->get(SettingsForm::SETTINGS);
     $this->entityTypeManager = $entity_type_manager;
-    $this->dateFormatter = $date_formatter;
+    $this->tempStore = $temp_store->get('simplepay');
 
     if (empty($this->config->get('data'))) {
       $this->messenger->addMessage($this->t('Please fill out <a href=":settings" target="_blank">simplepay settings!</a>', [':settings' => '/admin/config/simplepay/settings']));
@@ -121,8 +121,6 @@ class PaymentForm extends FormBase {
           'AUTOCHALLENGE' => TRUE,
         ];
 
-        require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
-
       } catch (InvalidPluginDefinitionException|PluginNotFoundException|EntityMalformedException $e) {
         $this->logger('simplepay')->warning($e->getMessage());
       }
@@ -144,7 +142,7 @@ class PaymentForm extends FormBase {
       $container->get('messenger'),
       $container->get('config.factory'),
       $container->get('entity_type.manager'),
-      $container->get('date.formatter')
+      $container->get('tempstore.private')
     );
   }
 
@@ -468,8 +466,10 @@ class PaymentForm extends FormBase {
 
     $faculties_data = $this->config->get('faculties');
     $selected_faculty = $form_state->getValues()['faculty'];
+    require_once dirname(__DIR__) . '/../sdk/SimplePayV21.php';
 
     $trx = new \SimplePayStart;
+
     $order_id = str_replace([
         '.',
         ':',
@@ -495,6 +495,13 @@ class PaymentForm extends FormBase {
     $trx->addGroupData('urls', 'cancel', $this->simplepayConfig['URLS_CANCEL']);
     $trx->addGroupData('urls', 'timeout', $this->simplepayConfig['URLS_TIMEOUT']);
 
+    $trx->addItems([
+      'ref' => $faculties_data[$selected_faculty]['pst'],
+      'title' => SettingsForm::FACULTIES[$selected_faculty],
+      'amount' => 1,
+      'price' => $faculties_data[$selected_faculty]['price'],
+    ]);
+
     $trx->addGroupData('invoice', 'name', $form_state->getValue('full_name'));
     $trx->addGroupData('invoice', 'country', 'hu');
     $trx->addGroupData('invoice', 'city', $form_state->getValue('city'));
@@ -503,6 +510,8 @@ class PaymentForm extends FormBase {
 
     $trx->runStart();
     $simplepay_data = $trx->getReturnData();
+    $this->logger('simplepay')->warning('<pre><code>' . print_r($this->simplepayConfig, TRUE) . '</code></pre>');
+    $this->logger('simplepay')->warning('<pre><code>' . print_r($simplepay_data, TRUE) . '</code></pre>');
 
     /** @var \Drupal\Core\Datetime\DrupalDateTime $dateObject */
     $dateObject = $form_state->getValue('date_of_birth');
@@ -539,6 +548,10 @@ class PaymentForm extends FormBase {
       'accept_photo' => $form_state->getValue('accept_photo'),
     ]);
 
+    $this->tempStore->set('price', $faculties_data[$selected_faculty]['price']);
+    $this->tempStore->set('order_id', $order_id);
+    $this->tempStore->set('transaction_id', $simplepay_data['transactionId']);
+
     try {
       $payment->save();
       $response = new TrustedRedirectResponse(Url::fromUri($simplepay_data['paymentUrl'])->toString());
@@ -549,6 +562,12 @@ class PaymentForm extends FormBase {
     }
   }
 
+  /**
+   * @param array $form
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *
+   * @return \Drupal\Core\Ajax\AjaxResponse
+   */
   public function loadInfo(array &$form, FormStateInterface $form_state): AjaxResponse {
     $response = new AjaxResponse();
     $response->addCommand(new HtmlCommand('div.form-item-info', $form['apply']));
